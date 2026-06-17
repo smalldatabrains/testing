@@ -12,10 +12,27 @@ TEXT = "hello world, attention is all you need! " * 20
 T = 16
 EPOCHS = 20
 LR = 0.01
+chars = sorted(list(set(TEXT)))
+vocab_size = len(chars)
+print("There are ", vocab_size, "in the dataset")
 
-# Vocabulary
+# Vocabulary naive embedding with dimension nb_char using dictionnary comprehension
+char2id = {i:c for i,c in enumerate(chars)}
+id2char = {c:i for i,c in enumerate(chars)}
+
+print(char2id)
+print(id2char)
+
 
 # Dataset construction
+def make_dataset(X):
+
+    
+    # X and X shifted one step + padding
+    dataset = None
+    # must return a tensor
+    return dataset
+
 
 # Single head attention
 class SingleHeadAttention(nn.Module):
@@ -81,9 +98,8 @@ if __name__ == "__main__":
 
     # config
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum = 0.9)
-
     
-    # training loop
+    # training loop for a next character model prediction
     for epoch in range(10):
 
         for input, target in dataset:
