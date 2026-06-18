@@ -9,30 +9,38 @@ import torch.optim as optim
 
 # Parameters
 TEXT = "hello world, attention is all you need! " * 20
-T = 16
+T = 5
 EPOCHS = 20
 LR = 0.01
 chars = sorted(list(set(TEXT)))
 vocab_size = len(chars)
 print("There are ", vocab_size, "in the dataset")
+print(chars)
 
 # Vocabulary naive embedding with dimension nb_char using dictionnary comprehension
-char2id = {i:c for i,c in enumerate(chars)}
-id2char = {c:i for i,c in enumerate(chars)}
+id2char = {i:c for i,c in enumerate(chars)}
+char2id = {c:i for i,c in enumerate(chars)}
 
 print(char2id)
 print(id2char)
 
 
-# Dataset construction
-def make_dataset(X):
-
-    
+# Dataset construction : T chars --> T +1 chars
+def make_dataset(X, T):
     # X and X shifted one step + padding
-    dataset = None
-    # must return a tensor
-    return dataset
+    X_encoded = [char2id[letter] for letter in X]
+    print(X_encoded[0:10])
+    X=[]
+    Y=[]
+    for i in range(len(X_encoded)-T):
+        X.append(X_encoded[i:i+T])
+        Y.append(X_encoded[i+T])
+        # we must return tensors
+    print(X[0])
+    print(Y[0])    
+    return torch.stack(X), torch.stack(Y) # (N,T) and (N,1)
 
+make_dataset(X=TEXT, T=T)
 
 # Single head attention
 class SingleHeadAttention(nn.Module):
