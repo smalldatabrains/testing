@@ -5,6 +5,7 @@ import torch.optim as optim
 
 # Model Visualization
 from torchviz import make_dot
+from torchinfo import summary
 
 
 
@@ -67,11 +68,11 @@ class SingleHeadAttention(nn.Module):
         d_v = d_v
         
         # Learnable layer with weights
-        self.embedding = nn.Embedding(vocab_size,D) # (vocab_size, D)
+        # self.embedding = nn.Embedding(vocab_size,D) # (vocab_size, D)
         self.Wq = nn.Linear(D, d_k) # this is a function X --> XW + b
         self.Wk = nn.Linear(D, d_k)
         self.Wv = nn.Linear(D, d_v)
-        self.fc_out = nn.Linear(d_v*T, vocab_size)
+        
 
         self.scale = d_k ** 0.5
 
@@ -80,46 +81,57 @@ class SingleHeadAttention(nn.Module):
 
     def forward(self, X):
         # X is of size (N, T)
-        X = self.embedding(X) # (N, T, D) because embedding is a lookup table that transform id (1 dimension to D dimensions)
+        # X = self.embedding(X) # (N, T, D) because embedding is a lookup table that transform id (1 dimension to D dimensions)
         Q = self.Wq(X) # (N, T, d_k)
         K = self.Wk(X) # (N, T, d_k)
         V = self.Wv(X) # (N, T, d_v)
         Kt = torch.transpose(K, -2, -1) # swap last 2 dimentions (N, d_k, T)
         scores = torch.matmul(Q, Kt) / self.scale # (N, T, d_k) * (N, d_k, T) --> (N, T, T)
         # attention = scores * 2
-        attention = self.softmax(scores) # (N, T, T)
+        attention = self.softmax(scores) # (N, T, T) how each token influences others
         output = torch.matmul(attention, V) # (N, T, T) * (N, T, d_v) --> (N, T, d_v)
-        flat = torch.flatten(output, start_dim=1)
+        flat = torch.flatten(output, start_dim=1) # 1 dimensional tensor, N*T*d_v
 
-        return attention
+        return attention, output
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, NH=6):
+    def __init__(self, D=12, d_v=32,  NH=6):
         super().__init__()
+
+        self.embedding = nn.Embedding(vocab_size,D) # (vocab_size, D)
 
         # nn.Sequential if fix size, nn.ModuleList if modulable qty of layer
         self.heads = nn.ModuleList(
             [SingleHeadAttention() for i in range(NH)]
-        )
+        ) # (NH, N, T, d_v)
 
-        self.Wo = nn.Linear()
+
+        self.Wo = nn.Linear(d_v*NH,D)
+        self.fc_out = nn.Linear(D, vocab_size)
 
     def forward(self, X):
-        X = torch.cat([])
-        output = self.Wo(X)
+        # Multihead
+        X = self.embedding(X)
+        residual = X
+        X = torch.cat([output for attention, output in [head(X) for head in self.heads]], dim=2) # (N, T, d_v), concatenation on d_v --> (N, T, d_v*NH)
+        # Norm
 
-        return output
+        # Feed Forward
+        output = self.Wo(X) # (N, T, D)
+        # Residual connections
+        output = output + residual # (N, T, D)
+        output = output [:, -1, :] # (N, D) only last token is returned to be compare to target ouput
+        logits = self.fc_out(output) # (N, vocab_size)
+        return logits
 
 if __name__ == "__main__":
     input = "I like cats very much"
     model = MultiHeadAttention()
 
     print("Model Layers : ", model)
-    # Png model architecture
-    dummy_input = torch.randint(0, vocab_size, (1, T))  # input fictif (B, T)
-    attention, yhat = model(dummy_input)  # yhat = logits
-    make_dot(yhat, params=dict(list(model.named_parameters()))).render("Transformers", format="png")
+    # Model architecture
+    summary(model, input_size=(1, T), dtypes=[torch.long])
 
     optimizer = optim.SGD(model.parameters(), lr=LR, momentum = 0.9)
     loss_fn = nn.CrossEntropyLoss()
@@ -129,17 +141,11 @@ if __name__ == "__main__":
     Y = Y_data
 
 
-    attention, logits = model(X)
+    logits = model(X)
 
     print("Input Shape : ", X.shape)
-    print("Attention Shape : ", attention.shape) # each token build his own attention matrix (T,T)
-    print(attention)
     print("Logits Shape : ", logits.shape)
     print(logits)
-
-    # Sanity check
-    summation = attention.sum(dim=-1)
-    print("Attention Rows sum to ", summation[0])
 
     # training loop for a next character model prediction
     for epoch in range(100):
@@ -148,14 +154,14 @@ if __name__ == "__main__":
             input = input.unsqueeze(0)
             target = target.unsqueeze(0)
             optimizer.zero_grad()
-            attention, logits = model(input)
+            logits = model(input)
             loss = loss_fn(logits, target)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        # Visualization
-        plt.clf() # clear previous figure
-        plt.imshow(attention[0].detach().numpy(), cmap = "Blues", vmin=0, vmax=1)
-        plt.colorbar()
-        plt.savefig("./figures/attention_weights_epoch_"+str(epoch +1)+".png", dpi=150, bbox_inches="tight")
+        # Visualization for SingleHeadAttention
+        # plt.clf() # clear previous figure
+        # plt.imshow(logits[0].detach().numpy(), cmap = "Blues", vmin=0, vmax=1)
+        # plt.colorbar()
+        # plt.savefig("./figures/attention_weights_epoch_"+str(epoch +1)+".png", dpi=150, bbox_inches="tight")
         print(f"Epoch {epoch + 1} | loss = {total_loss/len(X_data)}")
