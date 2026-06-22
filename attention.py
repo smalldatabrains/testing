@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import torch.optim as optim
 
 # Model Visualization
-from torchviz import make_dot
 from torchinfo import summary
 
 
@@ -126,8 +125,9 @@ class MultiHeadAttention(nn.Module):
         return logits
 
 if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input = "I like cats very much"
-    model = MultiHeadAttention()
+    model = MultiHeadAttention().to(device)
 
     print("Model Layers : ", model)
     # Model architecture
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     Y = Y_data
 
 
-    logits = model(X)
+    logits = model(X.to(device))
 
     print("Input Shape : ", X.shape)
     print("Logits Shape : ", logits.shape)
@@ -151,8 +151,8 @@ if __name__ == "__main__":
     for epoch in range(100):
         total_loss=0.0
         for input, target in zip(X_data, Y_data):
-            input = input.unsqueeze(0)
-            target = target.unsqueeze(0)
+            input = input.unsqueeze(0).to(device)
+            target = target.unsqueeze(0).to(device)
             optimizer.zero_grad()
             logits = model(input)
             loss = loss_fn(logits, target)
