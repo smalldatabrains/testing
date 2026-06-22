@@ -20,8 +20,13 @@ Summing the dot product with high values of d_k may grow large, thus pushing the
 - Why are different heads not learning the same things? Give some examples of what it's learning
 - How to keep the multihead computationnaly efficient?
 
+
+Transformer are different than attention. They are attention + stability engineering (residual connections, layernorm, FFN)
+
+Embedding and fc_out are shared between head so it should be in the MultiHeadAttention class (not in the SingleHeadAttention class)
+
 todo :
-- extend to multihead attention
+- extend to multihead attention (LayerNorm, SingleHeadStacking, Residual connections)
 - implement full transformer block
 - train on a toy dataset (at character level)
 - Describe encoder and decoder parts

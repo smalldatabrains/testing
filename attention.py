@@ -3,18 +3,22 @@ import torch
 import matplotlib.pyplot as plt
 import torch.optim as optim
 
+# Model Visualization
+from torchviz import make_dot
+
+
 
 # Attention is all you need implementation
 
 
 # Parameters
-TEXT = "hello world, attention is all you need! " * 20
+TEXT = "hello world, attention is all you need! " * 20 # len(TEXT) = 40 * 20 = 800
 T = 10
 EPOCHS = 20
 LR = 0.0001
 BATCH = 1
 chars = sorted(list(set(TEXT)))
-vocab_size = len(chars)
+vocab_size = len(chars) # contains characters and marks
 print("There are ", vocab_size, "characeters in the dataset")
 print(chars)
 
@@ -29,17 +33,24 @@ print(id2char)
 # Dataset construction : T chars --> T +1 chars
 def make_dataset(X, T):
     # X and X shifted one step + padding
-    X_encoded = torch.tensor([char2id[letter] for letter in X])
-    print(X_encoded[0:10])
+    X_encoded = torch.tensor([char2id[letter] for letter in X]) # encoding (len(X))
+    print(X_encoded[0:11]) # include on the left, exclude on the right
     X=[]
     Y=[]
-    for i in range(len(X_encoded)-T):
-        X.append(X_encoded[i:i+T])
-        Y.append(X_encoded[i+T].item())
+    for i in range(len(X_encoded)-T): 
+        X.append(X_encoded[i:i+T]) # (len(X)-T, T), we can set N = len(X)-T
+        Y.append(X_encoded[i+T].item()) # (len(X)-T, 1) -> (len(X) - T) because .item() removes the tensor dimension
         # we must return tensors
     print(X[0])
-    print(Y[0])    
-    return torch.stack(X), torch.tensor(Y, dtype=torch.long) # (N,T) and (N,1)
+    print(Y[0])
+    X_tensor = torch.stack(X)
+    Y_tensor = torch.tensor(Y)
+    print("X shape : ", X_tensor.shape)
+    print("Y shape : ", Y_tensor.shape)
+    return X_tensor, torch.tensor(Y, dtype=torch.long) # return (N,T) and (N,1) as input / output
+
+# Important note:
+# in the paper input is (N,T) but output is also (N,T) : they say input shifted right.
 
 X_data, Y_data = make_dataset(X=TEXT, T=T)
 
@@ -49,42 +60,67 @@ class SingleHeadAttention(nn.Module):
         super().__init__()
         # B Batch : qty of sentences that we batch at once (here only 1 for the exemple), size it up to availble memory
         # T : sentence dimension, tokens qty (we can pad for smaller sentence)
-        # D Embedding dimension (fetaure per token)
+        # D Embedding dimension (feature per token)
         
         # Q, K and V dimensions
         d_k = d_k
         d_v = d_v
         
-        self.embedding = nn.Embedding(vocab_size,D)
+        # Learnable layer with weights
+        self.embedding = nn.Embedding(vocab_size,D) # (vocab_size, D)
         self.Wq = nn.Linear(D, d_k) # this is a function X --> XW + b
         self.Wk = nn.Linear(D, d_k)
         self.Wv = nn.Linear(D, d_v)
-
         self.fc_out = nn.Linear(d_v*T, vocab_size)
 
         self.scale = d_k ** 0.5
 
+        # Activation function
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, X):
-        X = self.embedding(X)
-        Q = self.Wq(X)
-        K = self.Wk(X)
-        V = self.Wv(X)
-        Kt = torch.transpose(K, -2, -1) # swap last 2 dimentions
-        scores = torch.matmul(Q, Kt) / self.scale
+        # X is of size (N, T)
+        X = self.embedding(X) # (N, T, D) because embedding is a lookup table that transform id (1 dimension to D dimensions)
+        Q = self.Wq(X) # (N, T, d_k)
+        K = self.Wk(X) # (N, T, d_k)
+        V = self.Wv(X) # (N, T, d_v)
+        Kt = torch.transpose(K, -2, -1) # swap last 2 dimentions (N, d_k, T)
+        scores = torch.matmul(Q, Kt) / self.scale # (N, T, d_k) * (N, d_k, T) --> (N, T, T)
         # attention = scores * 2
-        attention = self.softmax(scores)
-        output = torch.matmul(attention, V)
+        attention = self.softmax(scores) # (N, T, T)
+        output = torch.matmul(attention, V) # (N, T, T) * (N, T, d_v) --> (N, T, d_v)
         flat = torch.flatten(output, start_dim=1)
-        logits = self.fc_out(flat)
 
-        return attention, logits
+        return attention
 
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, NH=6):
+        super().__init__()
+
+        # nn.Sequential if fix size, nn.ModuleList if modulable qty of layer
+        self.heads = nn.ModuleList(
+            [SingleHeadAttention() for i in range(NH)]
+        )
+
+        self.Wo = nn.Linear()
+
+    def forward(self, X):
+        X = torch.cat([])
+        output = self.Wo(X)
+
+        return output
 
 if __name__ == "__main__":
     input = "I like cats very much"
-    model = SingleHeadAttention()
+    model = MultiHeadAttention()
+
+    print("Model Layers : ", model)
+    # Png model architecture
+    dummy_input = torch.randint(0, vocab_size, (1, T))  # input fictif (B, T)
+    attention, yhat = model(dummy_input)  # yhat = logits
+    make_dot(yhat, params=dict(list(model.named_parameters()))).render("Transformers", format="png")
+
     optimizer = optim.SGD(model.parameters(), lr=LR, momentum = 0.9)
     loss_fn = nn.CrossEntropyLoss()
 
@@ -92,7 +128,6 @@ if __name__ == "__main__":
     X = X_data
     Y = Y_data
 
-    # X = X.unsqueeze(0) # 1 batch dimension
 
     attention, logits = model(X)
 
