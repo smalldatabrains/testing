@@ -6,6 +6,9 @@ import torch.optim as optim
 # Model Visualization
 from torchinfo import summary
 
+# Use of dataset and Dataloader for better GPU optimization
+from torch.utils.data import TensorDataset, DataLoader
+
 
 
 # Attention is all you need implementation
@@ -13,10 +16,12 @@ from torchinfo import summary
 
 # Parameters
 TEXT = "hello world, attention is all you need! " * 20 # len(TEXT) = 40 * 20 = 800
-T = 10
-EPOCHS = 20
+with open("data.txt", "r", encoding="utf-8") as f:
+    TEXT = f.read()
+T = 30
+EPOCHS = 100
 LR = 0.0001
-BATCH = 1
+BATCH = 40
 chars = sorted(list(set(TEXT)))
 vocab_size = len(chars) # contains characters and marks
 print("There are ", vocab_size, "characeters in the dataset")
@@ -56,7 +61,7 @@ X_data, Y_data = make_dataset(X=TEXT, T=T)
 
 # Single head attention
 class SingleHeadAttention(nn.Module):
-    def __init__(self, vocab_size=17, D = 12 , d_k = 32, d_v=32, T = 10):
+    def __init__(self, vocab_size=17, D = 12 , d_k = 32, d_v=32, T = 30):
         super().__init__()
         # B Batch : qty of sentences that we batch at once (here only 1 for the exemple), size it up to availble memory
         # T : sentence dimension, tokens qty (we can pad for smaller sentence)
@@ -126,7 +131,8 @@ class MultiHeadAttention(nn.Module):
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    input = "I like cats very much"
+    with open("data.txt", "r", encoding="utf-8") as f:
+        input = f.read()
     model = MultiHeadAttention().to(device)
 
     print("Model Layers : ", model)
@@ -140,19 +146,22 @@ if __name__ == "__main__":
     X = X_data
     Y = Y_data
 
+    dataset = TensorDataset(X_data, Y_data)
 
-    logits = model(X.to(device))
+    dataloader = DataLoader(dataset, batch_size= BATCH, shuffle=True)
 
-    print("Input Shape : ", X.shape)
-    print("Logits Shape : ", logits.shape)
-    print(logits)
+    # logits = model(X.to(device))
+
+    # print("Input Shape : ", X.shape)
+    # print("Logits Shape : ", logits.shape)
+    # print(logits)
 
     # training loop for a next character model prediction
     for epoch in range(100):
         total_loss=0.0
-        for input, target in zip(X_data, Y_data):
-            input = input.unsqueeze(0).to(device)
-            target = target.unsqueeze(0).to(device)
+        for input, target in dataloader:
+            input = input.to(device)
+            target = target.to(device)
             optimizer.zero_grad()
             logits = model(input)
             loss = loss_fn(logits, target)
@@ -164,4 +173,6 @@ if __name__ == "__main__":
         # plt.imshow(logits[0].detach().numpy(), cmap = "Blues", vmin=0, vmax=1)
         # plt.colorbar()
         # plt.savefig("./figures/attention_weights_epoch_"+str(epoch +1)+".png", dpi=150, bbox_inches="tight")
-        print(f"Epoch {epoch + 1} | loss = {total_loss/len(X_data)}")
+        print(f"Epoch {epoch + 1} | loss = {total_loss/len(dataloader)}")
+
+    # Inference exemple
