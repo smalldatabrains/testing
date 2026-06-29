@@ -38,5 +38,20 @@ todo :
 ## Stage 2 : Diffusion probabilistics models
 https://arxiv.org/abs/2006.11239
 
+Image synthesis reached good performance with GANs, auto regressive models and VAEs (they are called energy based models). This paper introduced a diffusion probabilistics model. Diffusion models are made of markov chains.
+
+Let's say we have a sample of data and we would like to approximate this data with a probability distribution.
+
+x ~ pdata(x)
+
+1. Destroy the data gradually
+2. Learn how to reverse the destruction
+
+Why add Gaussian noise?
+Why many small steps?
+What is q(xt∣xt−1)?
+Why is the forward process fixed?
+
+
 ## Stage 3 : Optimization intuition
 https://arxiv.org/abs/1412.6980
