@@ -37,6 +37,9 @@ todo :
 
 ## Stage 2 : Diffusion probabilistics models
 https://arxiv.org/abs/2006.11239
+https://arxiv.org/abs/2011.13456
+https://arxiv.org/abs/2010.02502
+https://arxiv.org/abs/2112.10752
 
 Image synthesis reached good performance with GANs, auto regressive models and VAEs (they are called energy based models). This paper introduced a diffusion probabilistics model. Diffusion models are made of markov chains.
 
